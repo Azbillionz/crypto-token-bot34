@@ -12,15 +12,15 @@ interface FourMemeToken {
   telegram?: string;
   telegramUrl?: string;
   telegramLink?: string;
-  label?: string;
+  createTime?: number;
 }
 
 interface FourMemeResponse {
   code?: number;
-  data?: FourMemeToken[] | { list?: FourMemeToken[]; tokenList?: FourMemeToken[] };
+  data?: FourMemeToken[];
 }
 
-export async function fetchFourMeme(): Promise<TokenAlert[]> {
+export async function fetchFourMeme(sinceMs: number): Promise<TokenAlert[]> {
   try {
     const res = await axios.get<FourMemeResponse>(FOUR_MEME_URL, {
       timeout: 10000,
@@ -32,16 +32,7 @@ export async function fetchFourMeme(): Promise<TokenAlert[]> {
       },
     });
 
-    let tokens: FourMemeToken[] = [];
-    const raw = res.data;
-
-    if (Array.isArray(raw?.data)) {
-      tokens = raw.data as FourMemeToken[];
-    } else if (raw?.data && typeof raw.data === "object" && !Array.isArray(raw.data)) {
-      const d = raw.data as { list?: FourMemeToken[]; tokenList?: FourMemeToken[] };
-      tokens = d.tokenList ?? d.list ?? [];
-    }
-
+    const tokens: FourMemeToken[] = Array.isArray(res.data?.data) ? res.data!.data! : [];
     const results: TokenAlert[] = [];
 
     for (const token of tokens) {
@@ -50,11 +41,7 @@ export async function fetchFourMeme(): Promise<TokenAlert[]> {
       if (!ca) continue;
 
       const tgLink =
-        token.tgUrl ??
-        token.tgLink ??
-        token.telegram ??
-        token.telegramUrl ??
-        token.telegramLink;
+        token.tgUrl ?? token.tgLink ?? token.telegram ?? token.telegramUrl ?? token.telegramLink;
 
       if (!tgLink) continue;
 
