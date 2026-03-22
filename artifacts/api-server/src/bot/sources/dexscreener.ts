@@ -2,26 +2,26 @@ import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
 
-const DEXSCREENER_URL = "https://api.dexscreener.com/token-profiles/latest/v1";
+const PROFILES_URL = "https://api.dexscreener.com/token-profiles/latest/v1";
 
-interface DexPair {
+interface DexProfile {
   tokenAddress?: string;
-  baseToken?: { address?: string; symbol?: string };
+  chainId?: string;
   links?: Array<{ type?: string; label?: string; url?: string }>;
 }
 
-export async function fetchDexScreener(): Promise<TokenAlert[]> {
+export async function fetchDexScreener(_sinceMs: number): Promise<TokenAlert[]> {
   try {
-    const res = await axios.get<DexPair[]>(DEXSCREENER_URL, { timeout: 10000 });
-    const pairs: DexPair[] = Array.isArray(res.data) ? res.data : [];
+    const res = await axios.get<DexProfile[]>(PROFILES_URL, { timeout: 10000 });
+    const profiles: DexProfile[] = Array.isArray(res.data) ? res.data : [];
     const results: TokenAlert[] = [];
 
-    for (const pair of pairs) {
-      const ca = pair.tokenAddress ?? pair.baseToken?.address;
-      const symbol = pair.baseToken?.symbol ?? "UNKNOWN";
+    for (const profile of profiles) {
+      const ca = profile.tokenAddress;
+      const chainId = profile.chainId ?? "unknown";
       if (!ca) continue;
 
-      const links: Array<{ type?: string; label?: string; url?: string }> = pair.links ?? [];
+      const links = profile.links ?? [];
       const tgLink = links.find(
         (l) =>
           l.url &&
@@ -32,9 +32,15 @@ export async function fetchDexScreener(): Promise<TokenAlert[]> {
       );
       if (!tgLink?.url) continue;
 
-      results.push({ ca, symbol, telegramLink: tgLink.url, source: "DexScreener" });
+      results.push({
+        ca,
+        symbol: ca.slice(0, 6),
+        telegramLink: tgLink.url,
+        source: `DexScreener (${chainId})`,
+      });
     }
 
+    logger.info({ source: "DexScreener", found: results.length }, "DexScreener fetch complete");
     return results;
   } catch (err) {
     const status = (err as { response?: { status?: number } })?.response?.status;

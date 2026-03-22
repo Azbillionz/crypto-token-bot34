@@ -8,21 +8,25 @@ import { fetchTop100Token } from "./sources/top100token";
 
 const INTERVAL_MS = 60_000;
 
-async function runCycle(): Promise<void> {
-  logger.info("Worker cycle started — polling all sources");
+let lastPollTime = Date.now() - INTERVAL_MS * 2;
 
-  const [dex, pump, four, top100] = await Promise.allSettled([
-    fetchDexScreener(),
-    fetchPumpFun(),
-    fetchFourMeme(),
-    fetchTop100Token(),
+async function runCycle(): Promise<void> {
+  const cycleStart = Date.now();
+  const sinceMs = lastPollTime;
+  logger.info({ sinceMs: new Date(sinceMs).toISOString() }, "Worker cycle started — polling all sources");
+
+  const [dex, pump, four, boosted] = await Promise.allSettled([
+    fetchDexScreener(sinceMs),
+    fetchPumpFun(sinceMs),
+    fetchFourMeme(sinceMs),
+    fetchTop100Token(sinceMs),
   ]);
 
   const all = [
     ...(dex.status === "fulfilled" ? dex.value : []),
     ...(pump.status === "fulfilled" ? pump.value : []),
     ...(four.status === "fulfilled" ? four.value : []),
-    ...(top100.status === "fulfilled" ? top100.value : []),
+    ...(boosted.status === "fulfilled" ? boosted.value : []),
   ];
 
   logger.info({ total: all.length }, "Tokens found across all sources");
@@ -35,6 +39,7 @@ async function runCycle(): Promise<void> {
     sent++;
   }
 
+  lastPollTime = cycleStart;
   logger.info({ sent }, "Worker cycle complete");
 }
 

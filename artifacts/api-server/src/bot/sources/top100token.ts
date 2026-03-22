@@ -2,31 +2,27 @@ import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
 
-const TOP100_URL = "https://api.dexscreener.com/token-profiles/latest/v1";
+const BOOSTED_URL = "https://api.dexscreener.com/token-boosts/latest/v1";
 
-interface DexToken {
+interface DexBoosted {
   tokenAddress?: string;
   chainId?: string;
-  icon?: string;
-  description?: string;
   links?: Array<{ type?: string; label?: string; url?: string }>;
 }
 
-export async function fetchTop100Token(): Promise<TokenAlert[]> {
+export async function fetchTop100Token(_sinceMs: number): Promise<TokenAlert[]> {
   try {
-    const res = await axios.get<DexToken[]>(TOP100_URL, {
-      timeout: 10000,
-      params: { chainId: "bsc" },
-    });
-
-    const tokens: DexToken[] = Array.isArray(res.data) ? res.data : [];
+    const res = await axios.get<DexBoosted[]>(BOOSTED_URL, { timeout: 10000 });
+    const tokens: DexBoosted[] = Array.isArray(res.data) ? res.data : [];
     const results: TokenAlert[] = [];
 
     for (const token of tokens) {
       const ca = token.tokenAddress;
+      const chainId = token.chainId ?? "unknown";
       if (!ca) continue;
 
-      const tgLink = (token.links ?? []).find(
+      const links = token.links ?? [];
+      const tgLink = links.find(
         (l) =>
           l.url &&
           (l.type === "telegram" ||
@@ -36,13 +32,19 @@ export async function fetchTop100Token(): Promise<TokenAlert[]> {
       );
       if (!tgLink?.url) continue;
 
-      results.push({ ca, symbol: ca.slice(0, 8), telegramLink: tgLink.url, source: "BSC/DexScreener" });
+      results.push({
+        ca,
+        symbol: ca.slice(0, 6),
+        telegramLink: tgLink.url,
+        source: `Boosted (${chainId})`,
+      });
     }
 
+    logger.info({ source: "DexScreener-Boosted", found: results.length }, "Boosted tokens fetch complete");
     return results;
   } catch (err) {
     const status = (err as { response?: { status?: number } })?.response?.status;
-    logger.warn({ source: "top100token", status }, "BSC/DexScreener fetch failed");
+    logger.warn({ source: "DexScreener-Boosted", status }, "Boosted tokens fetch failed");
     return [];
   }
 }
