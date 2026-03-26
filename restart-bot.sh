@@ -10,4 +10,4 @@ fi
 sleep 1
 echo "Starting bot..."
 cd /home/runner/workspace/artifacts/api-server
-node --enable-source-maps ./dist/index.mjs
+PORT=8080 node --enable-source-maps ./dist/index.mjs
