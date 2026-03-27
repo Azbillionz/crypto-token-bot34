@@ -5,6 +5,7 @@ import { fetchDexScreener } from "./sources/dexscreener";
 import { fetchPumpFun } from "./sources/pumpfun";
 import { fetchFourMeme } from "./sources/fourmeme";
 import { fetchTop100Token } from "./sources/top100token";
+import { fetchGeckoTerminal } from "./sources/geckoterminal";
 
 const INTERVAL_MS = 60_000;
 
@@ -15,11 +16,12 @@ async function runCycle(): Promise<void> {
   const sinceMs = lastPollTime;
   logger.info({ sinceMs: new Date(sinceMs).toISOString() }, "Worker cycle started — polling all sources");
 
-  const [dex, pump, four, boosted] = await Promise.allSettled([
+  const [dex, pump, four, boosted, gecko] = await Promise.allSettled([
     fetchDexScreener(sinceMs),
     fetchPumpFun(sinceMs),
     fetchFourMeme(sinceMs),
     fetchTop100Token(sinceMs),
+    fetchGeckoTerminal(sinceMs),
   ]);
 
   const all = [
@@ -27,6 +29,7 @@ async function runCycle(): Promise<void> {
     ...(pump.status === "fulfilled" ? pump.value : []),
     ...(four.status === "fulfilled" ? four.value : []),
     ...(boosted.status === "fulfilled" ? boosted.value : []),
+    ...(gecko.status === "fulfilled" ? gecko.value : []),
   ];
 
   logger.info({ total: all.length }, "Tokens found across all sources");

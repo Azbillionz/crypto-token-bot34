@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "kill -9 $(ss -tlnp sport = :8080 2>/dev/null | grep -oP 'pid=\\K[0-9]+' | head -1) 2>/dev/null; sleep 1; export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "node kill-port.mjs 8080; sleep 1; export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
