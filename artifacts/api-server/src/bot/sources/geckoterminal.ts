@@ -1,8 +1,9 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
+import { getCreationTimes, isRecent } from "./utils";
 
-const URL = "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated";
+const GT_URL = "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated";
 
 interface GeckoToken {
   id?: string;
@@ -11,7 +12,6 @@ interface GeckoToken {
     name?: string;
     symbol?: string;
     telegram_handle?: string;
-    network_id?: string;
   };
   relationships?: {
     network?: { data?: { id?: string } };
@@ -20,24 +20,36 @@ interface GeckoToken {
 
 export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]> {
   try {
-    const res = await axios.get<{ data: GeckoToken[] }>(URL, {
+    const res = await axios.get<{ data: GeckoToken[] }>(GT_URL, {
       timeout: 10000,
       headers: { Accept: "application/json" },
     });
 
     const tokens: GeckoToken[] = res.data?.data ?? [];
-    const results: TokenAlert[] = [];
 
+    // First pass — collect tokens with Telegram handles
+    const candidates: Array<{ ca: string; symbol: string; tgLink: string; network: string }> = [];
     for (const token of tokens) {
       const attrs = token.attributes;
       const ca = attrs?.address;
       const symbol = attrs?.symbol ?? "UNKNOWN";
       const tgHandle = attrs?.telegram_handle;
       if (!ca || !tgHandle) continue;
+      const network =
+        token.relationships?.network?.data?.id ?? token.id?.split("_")[0] ?? "unknown";
+      const tgLink = tgHandle.startsWith("http")
+        ? tgHandle
+        : `https://t.me/${tgHandle.replace(/^@/, "")}`;
+      candidates.push({ ca, symbol, tgLink, network });
+    }
 
-      const network = token.relationships?.network?.data?.id ?? token.id?.split("_")[0] ?? "unknown";
-      const tgLink = tgHandle.startsWith("http") ? tgHandle : `https://t.me/${tgHandle.replace(/^@/, "")}`;
+    // Batch-lookup creation times via DexScreener pairs API
+    const creationTimes = await getCreationTimes(candidates.map((c) => c.ca));
 
+    const results: TokenAlert[] = [];
+    for (const { ca, symbol, tgLink, network } of candidates) {
+      const createdAt = creationTimes.get(ca.toLowerCase());
+      if (createdAt && !isRecent(createdAt)) continue;
       results.push({ ca, symbol, telegramLink: tgLink, source: `GeckoTerminal (${network})` });
     }
 
