@@ -1,8 +1,10 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
+import { isRecent } from "./utils";
 
-const PUMP_API = "https://frontend-api-v3.pump.fun/coins?offset=0&limit=50&sort=created_timestamp&order=DESC&includeNsfw=false";
+const PUMP_API =
+  "https://frontend-api-v3.pump.fun/coins?offset=0&limit=50&sort=created_timestamp&order=DESC&includeNsfw=false";
 
 interface PumpCoin {
   mint?: string;
@@ -28,9 +30,12 @@ export async function fetchPumpFun(_sinceMs: number): Promise<TokenAlert[]> {
       const ca = coin.mint;
       const symbol = coin.symbol ?? "UNKNOWN";
       const tg = coin.telegram;
-      const createdAt = coin.created_timestamp ?? 0;
-
+      const rawTs = coin.created_timestamp ?? 0;
       if (!ca || !tg) continue;
+
+      // created_timestamp is in ms on pump.fun v3
+      const createdAtMs = rawTs > 1e12 ? rawTs : rawTs * 1000;
+      if (rawTs > 0 && !isRecent(createdAtMs)) continue;
 
       const tgLink = tg.startsWith("http") ? tg : `https://t.me/${tg.replace(/^@/, "")}`;
       results.push({ ca, symbol, telegramLink: tgLink, source: "pump.fun" });

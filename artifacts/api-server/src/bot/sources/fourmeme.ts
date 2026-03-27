@@ -1,6 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
+import { isRecent } from "./utils";
 
 const FOUR_MEME_URL = "https://four.meme/meme-api/v1/private/token/query";
 
@@ -12,6 +13,7 @@ interface FourMemeToken {
   telegram?: string;
   telegramUrl?: string;
   telegramLink?: string;
+  launchTime?: number;
   createTime?: number;
 }
 
@@ -20,7 +22,7 @@ interface FourMemeResponse {
   data?: FourMemeToken[];
 }
 
-export async function fetchFourMeme(sinceMs: number): Promise<TokenAlert[]> {
+export async function fetchFourMeme(_sinceMs: number): Promise<TokenAlert[]> {
   try {
     const res = await axios.get<FourMemeResponse>(FOUR_MEME_URL, {
       timeout: 10000,
@@ -40,9 +42,13 @@ export async function fetchFourMeme(sinceMs: number): Promise<TokenAlert[]> {
       const symbol = token.symbol ?? "UNKNOWN";
       if (!ca) continue;
 
+      const rawTs = token.launchTime ?? token.createTime ?? 0;
+      // launchTime / createTime are in ms
+      const createdAtMs = rawTs > 1e12 ? rawTs : rawTs * 1000;
+      if (rawTs > 0 && !isRecent(createdAtMs)) continue;
+
       const tgLink =
         token.tgUrl ?? token.tgLink ?? token.telegram ?? token.telegramUrl ?? token.telegramLink;
-
       if (!tgLink) continue;
 
       const finalLink = tgLink.startsWith("http")

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
+import { getCreationTimes, isRecent } from "./utils";
 
 const PROFILES_URL = "https://api.dexscreener.com/token-profiles/latest/v1";
 
@@ -14,13 +15,13 @@ export async function fetchDexScreener(_sinceMs: number): Promise<TokenAlert[]> 
   try {
     const res = await axios.get<DexProfile[]>(PROFILES_URL, { timeout: 10000 });
     const profiles: DexProfile[] = Array.isArray(res.data) ? res.data : [];
-    const results: TokenAlert[] = [];
 
+    // First pass — collect only tokens with Telegram links
+    const candidates: Array<{ ca: string; chainId: string; tgUrl: string }> = [];
     for (const profile of profiles) {
       const ca = profile.tokenAddress;
       const chainId = profile.chainId ?? "unknown";
       if (!ca) continue;
-
       const links = profile.links ?? [];
       const tgLink = links.find(
         (l) =>
@@ -31,11 +32,20 @@ export async function fetchDexScreener(_sinceMs: number): Promise<TokenAlert[]> 
             l.url.includes("telegram")),
       );
       if (!tgLink?.url) continue;
+      candidates.push({ ca, chainId, tgUrl: tgLink.url });
+    }
 
+    // Batch-lookup creation times via DexScreener pairs API
+    const creationTimes = await getCreationTimes(candidates.map((c) => c.ca));
+
+    const results: TokenAlert[] = [];
+    for (const { ca, chainId, tgUrl } of candidates) {
+      const createdAt = creationTimes.get(ca.toLowerCase());
+      if (createdAt && !isRecent(createdAt)) continue;
       results.push({
         ca,
         symbol: ca.slice(0, 6),
-        telegramLink: tgLink.url,
+        telegramLink: tgUrl,
         source: `DexScreener (${chainId})`,
       });
     }
