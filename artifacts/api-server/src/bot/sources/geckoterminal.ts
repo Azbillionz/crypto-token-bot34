@@ -12,6 +12,7 @@ interface GeckoToken {
     name?: string;
     symbol?: string;
     telegram_handle?: string;
+    image_url?: string;
   };
   relationships?: {
     network?: { data?: { id?: string } };
@@ -27,30 +28,48 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
 
     const tokens: GeckoToken[] = res.data?.data ?? [];
 
-    // First pass — collect tokens with Telegram handles
-    const candidates: Array<{ ca: string; symbol: string; tgLink: string; network: string }> = [];
+    const candidates: Array<{
+      ca: string;
+      symbol: string;
+      name?: string;
+      tgLink: string;
+      network: string;
+      imageUrl?: string;
+    }> = [];
+
     for (const token of tokens) {
       const attrs = token.attributes;
       const ca = attrs?.address;
       const symbol = attrs?.symbol ?? "UNKNOWN";
       const tgHandle = attrs?.telegram_handle;
       if (!ca || !tgHandle) continue;
+
       const network =
         token.relationships?.network?.data?.id ?? token.id?.split("_")[0] ?? "unknown";
       const tgLink = tgHandle.startsWith("http")
         ? tgHandle
         : `https://t.me/${tgHandle.replace(/^@/, "")}`;
-      candidates.push({ ca, symbol, tgLink, network });
+      const imageUrl =
+        attrs?.image_url && attrs.image_url.startsWith("http") ? attrs.image_url : undefined;
+
+      candidates.push({ ca, symbol, name: attrs?.name, tgLink, network, imageUrl });
     }
 
-    // Batch-lookup creation times via DexScreener pairs API
     const creationTimes = await getCreationTimes(candidates.map((c) => c.ca));
 
     const results: TokenAlert[] = [];
-    for (const { ca, symbol, tgLink, network } of candidates) {
+    for (const { ca, symbol, name, tgLink, network, imageUrl } of candidates) {
       const createdAt = creationTimes.get(ca.toLowerCase());
       if (createdAt && !isRecent(createdAt)) continue;
-      results.push({ ca, symbol, telegramLink: tgLink, source: `GeckoTerminal (${network})` });
+      results.push({
+        ca,
+        symbol,
+        name,
+        chain: network,
+        telegramLink: tgLink,
+        source: `GeckoTerminal (${network})`,
+        imageUrl,
+      });
     }
 
     logger.info({ source: "GeckoTerminal", found: results.length }, "GeckoTerminal fetch complete");

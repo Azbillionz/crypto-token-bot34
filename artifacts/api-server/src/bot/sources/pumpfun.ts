@@ -8,9 +8,12 @@ const PUMP_API =
 
 interface PumpCoin {
   mint?: string;
+  name?: string;
   symbol?: string;
   telegram?: string;
   created_timestamp?: number;
+  image_uri?: string;
+  image?: string;
 }
 
 export async function fetchPumpFun(_sinceMs: number): Promise<TokenAlert[]> {
@@ -33,12 +36,21 @@ export async function fetchPumpFun(_sinceMs: number): Promise<TokenAlert[]> {
       const rawTs = coin.created_timestamp ?? 0;
       if (!ca || !tg) continue;
 
-      // created_timestamp is in ms on pump.fun v3
       const createdAtMs = rawTs > 1e12 ? rawTs : rawTs * 1000;
       if (rawTs > 0 && !isRecent(createdAtMs)) continue;
 
       const tgLink = tg.startsWith("http") ? tg : `https://t.me/${tg.replace(/^@/, "")}`;
-      results.push({ ca, symbol, telegramLink: tgLink, source: "pump.fun" });
+      const imageUrl = coin.image_uri ?? coin.image;
+
+      results.push({
+        ca,
+        symbol,
+        name: coin.name,
+        chain: "solana",
+        telegramLink: tgLink,
+        source: "pump.fun",
+        imageUrl: imageUrl && imageUrl.startsWith("http") ? imageUrl : undefined,
+      });
     }
 
     logger.info({ source: "pump.fun", found: results.length }, "pump.fun fetch complete");

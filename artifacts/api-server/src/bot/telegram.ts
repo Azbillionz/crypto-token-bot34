@@ -14,6 +14,9 @@ export interface TokenAlert {
   ca: string;
   telegramLink: string;
   source: string;
+  imageUrl?: string;
+  name?: string;
+  chain?: string;
 }
 
 function escapeHtml(text: string): string {
@@ -23,20 +26,77 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;");
 }
 
-export async function sendTokenAlert(alert: TokenAlert): Promise<void> {
-  const message = [
-    `🚀 <b>New Token Detected!</b>`,
+function buildDexUrl(ca: string, chain: string): string {
+  const chainMap: Record<string, string> = {
+    solana: "solana",
+    bsc: "bsc",
+    ethereum: "ethereum",
+    eth: "ethereum",
+    base: "base",
+    arbitrum: "arbitrum",
+    polygon: "polygon",
+    avalanche: "avalanche",
+    avax: "avalanche",
+  };
+  const normalized = chainMap[chain.toLowerCase()] ?? chain.toLowerCase();
+  return `https://dexscreener.com/${normalized}/${ca}`;
+}
+
+function buildCaption(alert: TokenAlert): string {
+  const name = alert.name ? escapeHtml(alert.name) : null;
+  const symbol = escapeHtml(alert.symbol);
+  const ca = escapeHtml(alert.ca);
+  const source = escapeHtml(alert.source);
+  const chain = alert.chain ? escapeHtml(alert.chain.toUpperCase()) : null;
+  const dexUrl = alert.chain ? buildDexUrl(alert.ca, alert.chain) : null;
+
+  const lines: string[] = [
+    `🚀 <b>NEW TOKEN LAUNCH DETECTED</b>`,
+    `━━━━━━━━━━━━━━━━━━━━`,
     ``,
-    `💬 <b>Socials:</b> <a href="${escapeHtml(alert.telegramLink)}">Telegram</a>`,
-    `📝 <b>CA:</b> <code>${escapeHtml(alert.ca)}</code>`,
-    `🪙 <b>Symbol:</b> $${escapeHtml(alert.symbol)}`,
-    `🌐 <b>Source:</b> ${escapeHtml(alert.source)}`,
-  ].join("\n");
+    name
+      ? `🪙 <b>${symbol}</b>  —  ${name}`
+      : `🪙 <b>$${symbol}</b>`,
+    chain ? `⛓ <b>Chain:</b>  ${chain}` : "",
+    ``,
+    `📋 <b>Contract Address:</b>`,
+    `<code>${ca}</code>`,
+    ``,
+    `🔗 <b>Links:</b>`,
+    `  💬 <a href="${escapeHtml(alert.telegramLink)}">Telegram Community</a>`,
+    dexUrl ? `  📊 <a href="${escapeHtml(dexUrl)}">View Chart on DexScreener</a>` : "",
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `📡 <i>Detected via ${source}</i>`,
+  ]
+    .filter((l) => l !== undefined && l !== null)
+    .join("\n");
+
+  return lines;
+}
+
+export async function sendTokenAlert(alert: TokenAlert): Promise<void> {
+  const caption = buildCaption(alert);
 
   try {
-    await bot.sendMessage(channelId!, message, { parse_mode: "HTML" });
+    if (alert.imageUrl) {
+      await bot.sendPhoto(channelId!, alert.imageUrl, {
+        caption,
+        parse_mode: "HTML",
+      });
+    } else {
+      await bot.sendMessage(channelId!, caption, { parse_mode: "HTML" });
+    }
     logger.info({ ca: alert.ca, symbol: alert.symbol, source: alert.source }, "Alert sent");
   } catch (err) {
+    // If sendPhoto fails (bad image URL), fall back to text-only
+    if (alert.imageUrl) {
+      try {
+        await bot.sendMessage(channelId!, caption, { parse_mode: "HTML" });
+        logger.info({ ca: alert.ca, symbol: alert.symbol, source: alert.source }, "Alert sent (text fallback)");
+        return;
+      } catch (_) {}
+    }
     logger.error({ err, ca: alert.ca }, "Failed to send Telegram alert");
   }
 }
