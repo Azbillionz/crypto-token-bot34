@@ -8,6 +8,9 @@ const BOOSTED_URL = "https://api.dexscreener.com/token-boosts/latest/v1";
 interface DexBoosted {
   tokenAddress?: string;
   chainId?: string;
+  icon?: string;
+  header?: string;
+  openGraph?: string;
   links?: Array<{ type?: string; label?: string; url?: string }>;
 }
 
@@ -16,8 +19,7 @@ export async function fetchTop100Token(_sinceMs: number): Promise<TokenAlert[]> 
     const res = await axios.get<DexBoosted[]>(BOOSTED_URL, { timeout: 10000 });
     const tokens: DexBoosted[] = Array.isArray(res.data) ? res.data : [];
 
-    // First pass — collect tokens with Telegram links
-    const candidates: Array<{ ca: string; chainId: string; tgUrl: string }> = [];
+    const candidates: Array<{ ca: string; chainId: string; tgUrl: string; imageUrl?: string }> = [];
     for (const token of tokens) {
       const ca = token.tokenAddress;
       const chainId = token.chainId ?? "unknown";
@@ -32,21 +34,31 @@ export async function fetchTop100Token(_sinceMs: number): Promise<TokenAlert[]> 
             l.url.includes("telegram")),
       );
       if (!tgLink?.url) continue;
-      candidates.push({ ca, chainId, tgUrl: tgLink.url });
+
+      const rawIcon = token.icon;
+      const imageUrl =
+        rawIcon && rawIcon.startsWith("http")
+          ? rawIcon
+          : token.openGraph && token.openGraph.startsWith("http")
+          ? token.openGraph
+          : undefined;
+
+      candidates.push({ ca, chainId, tgUrl: tgLink.url, imageUrl });
     }
 
-    // Batch-lookup creation times via DexScreener pairs API
     const creationTimes = await getCreationTimes(candidates.map((c) => c.ca));
 
     const results: TokenAlert[] = [];
-    for (const { ca, chainId, tgUrl } of candidates) {
+    for (const { ca, chainId, tgUrl, imageUrl } of candidates) {
       const createdAt = creationTimes.get(ca.toLowerCase());
       if (createdAt && !isRecent(createdAt)) continue;
       results.push({
         ca,
         symbol: ca.slice(0, 6),
+        chain: chainId,
         telegramLink: tgUrl,
         source: `Boosted (${chainId})`,
+        imageUrl,
       });
     }
 

@@ -10,7 +10,7 @@ function load(): Set<string> {
   try {
     if (existsSync(CACHE_FILE)) {
       const data = JSON.parse(readFileSync(CACHE_FILE, "utf-8")) as string[];
-      seen = new Set(data);
+      seen = new Set(data.map((ca) => ca.toLowerCase()));
     } else {
       seen = new Set();
     }
@@ -23,15 +23,14 @@ function load(): Set<string> {
 function persist(): void {
   try {
     writeFileSync(CACHE_FILE, JSON.stringify([...seen]), "utf-8");
-  } catch {
-  }
+  } catch {}
 }
 
 export function hasSeen(ca: string): boolean {
-  return load().has(ca);
+  return load().has(ca.toLowerCase());
 }
 
 export function markSeen(ca: string): void {
-  load().add(ca);
+  load().add(ca.toLowerCase());
   persist();
 }

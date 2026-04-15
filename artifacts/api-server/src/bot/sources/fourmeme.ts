@@ -7,6 +7,7 @@ const FOUR_MEME_URL = "https://four.meme/meme-api/v1/private/token/query";
 
 interface FourMemeToken {
   address?: string;
+  name?: string;
   symbol?: string;
   tgUrl?: string;
   tgLink?: string;
@@ -15,6 +16,11 @@ interface FourMemeToken {
   telegramLink?: string;
   launchTime?: number;
   createTime?: number;
+  logo?: string;
+  logoUrl?: string;
+  image?: string;
+  imageUrl?: string;
+  icon?: string;
 }
 
 interface FourMemeResponse {
@@ -43,7 +49,6 @@ export async function fetchFourMeme(_sinceMs: number): Promise<TokenAlert[]> {
       if (!ca) continue;
 
       const rawTs = token.launchTime ?? token.createTime ?? 0;
-      // launchTime / createTime are in ms
       const createdAtMs = rawTs > 1e12 ? rawTs : rawTs * 1000;
       if (rawTs > 0 && !isRecent(createdAtMs)) continue;
 
@@ -55,7 +60,19 @@ export async function fetchFourMeme(_sinceMs: number): Promise<TokenAlert[]> {
         ? tgLink
         : `https://t.me/${tgLink.replace(/^@/, "")}`;
 
-      results.push({ ca, symbol, telegramLink: finalLink, source: "four.meme" });
+      const rawImage =
+        token.logo ?? token.logoUrl ?? token.image ?? token.imageUrl ?? token.icon;
+      const imageUrl = rawImage && rawImage.startsWith("http") ? rawImage : undefined;
+
+      results.push({
+        ca,
+        symbol,
+        name: token.name,
+        chain: "bsc",
+        telegramLink: finalLink,
+        source: "four.meme",
+        imageUrl,
+      });
     }
 
     logger.info({ source: "four.meme", found: results.length }, "four.meme fetch complete");
