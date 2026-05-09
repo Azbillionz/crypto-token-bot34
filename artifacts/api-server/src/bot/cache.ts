@@ -2,27 +2,44 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
 const CACHE_FILE = join(process.cwd(), "seen-tokens.json");
+const TTL_MS = 24 * 60 * 60 * 1000;
 
-let seen: Set<string>;
+type CacheEntry = [string, number];
 
-function load(): Set<string> {
+let seen: Map<string, number>;
+
+function load(): Map<string, number> {
   if (seen) return seen;
+  const now = Date.now();
   try {
     if (existsSync(CACHE_FILE)) {
-      const data = JSON.parse(readFileSync(CACHE_FILE, "utf-8")) as string[];
-      seen = new Set(data.map((ca) => ca.toLowerCase()));
+      const raw = JSON.parse(readFileSync(CACHE_FILE, "utf-8")) as unknown;
+      seen = new Map();
+      if (Array.isArray(raw)) {
+        for (const entry of raw) {
+          if (typeof entry === "string") {
+            seen.set(entry.toLowerCase(), now);
+          } else if (Array.isArray(entry) && entry.length === 2) {
+            const [ca, ts] = entry as [string, number];
+            if (now - ts <= TTL_MS) {
+              seen.set(ca.toLowerCase(), ts);
+            }
+          }
+        }
+      }
     } else {
-      seen = new Set();
+      seen = new Map();
     }
   } catch {
-    seen = new Set();
+    seen = new Map();
   }
   return seen;
 }
 
 function persist(): void {
   try {
-    writeFileSync(CACHE_FILE, JSON.stringify([...seen]), "utf-8");
+    const entries: CacheEntry[] = [...load().entries()];
+    writeFileSync(CACHE_FILE, JSON.stringify(entries), "utf-8");
   } catch {}
 }
 
@@ -31,6 +48,6 @@ export function hasSeen(ca: string): boolean {
 }
 
 export function markSeen(ca: string): void {
-  load().add(ca.toLowerCase());
+  load().set(ca.toLowerCase(), Date.now());
   persist();
 }
