@@ -3,7 +3,7 @@ import { hasSeen, markSeen } from "./cache";
 import { sendTokenAlert } from "./telegram";
 import { fetchDexScreener } from "./sources/dexscreener";
 import { fetchPumpFun } from "./sources/pumpfun";
-import { fetchFourMeme } from "./sources/fourmeme";
+import { fetchSunPump } from "./sources/sunpump";
 import { fetchTop100Token } from "./sources/top100token";
 import { fetchGeckoTerminal } from "./sources/geckoterminal";
 
@@ -16,10 +16,10 @@ async function runCycle(): Promise<void> {
   const sinceMs = lastPollTime;
   logger.info({ sinceMs: new Date(sinceMs).toISOString() }, "Worker cycle started — polling all sources");
 
-  const [dex, pump, four, boosted, gecko] = await Promise.allSettled([
+  const [dex, pump, sun, boosted, gecko] = await Promise.allSettled([
     fetchDexScreener(sinceMs),
     fetchPumpFun(sinceMs),
-    fetchFourMeme(sinceMs),
+    fetchSunPump(sinceMs),
     fetchTop100Token(sinceMs),
     fetchGeckoTerminal(sinceMs),
   ]);
@@ -27,7 +27,7 @@ async function runCycle(): Promise<void> {
   const all = [
     ...(dex.status === "fulfilled" ? dex.value : []),
     ...(pump.status === "fulfilled" ? pump.value : []),
-    ...(four.status === "fulfilled" ? four.value : []),
+    ...(sun.status === "fulfilled" ? sun.value : []),
     ...(boosted.status === "fulfilled" ? boosted.value : []),
     ...(gecko.status === "fulfilled" ? gecko.value : []),
   ];
