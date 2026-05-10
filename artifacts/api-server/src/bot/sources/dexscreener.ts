@@ -14,26 +14,47 @@ interface DexProfile {
   links?: Array<{ type?: string; label?: string; url?: string }>;
 }
 
+function extractLink(
+  links: Array<{ type?: string; label?: string; url?: string }>,
+  matchers: { type?: string; urlIncludes?: string[] },
+): string | undefined {
+  const match = links.find((l) => {
+    if (!l.url) return false;
+    if (matchers.type && l.type === matchers.type) return true;
+    if (matchers.urlIncludes?.some((s) => l.url!.includes(s))) return true;
+    return false;
+  });
+  return match?.url;
+}
+
 export async function fetchDexScreener(_sinceMs: number): Promise<TokenAlert[]> {
   try {
     const res = await axios.get<DexProfile[]>(PROFILES_URL, { timeout: 10000 });
     const profiles: DexProfile[] = Array.isArray(res.data) ? res.data : [];
 
-    const candidates: Array<{ ca: string; chainId: string; tgUrl: string; imageUrl?: string }> = [];
+    const candidates: Array<{
+      ca: string;
+      chainId: string;
+      tgUrl: string;
+      imageUrl?: string;
+      websiteUrl?: string;
+      twitterUrl?: string;
+    }> = [];
+
     for (const profile of profiles) {
       const ca = profile.tokenAddress;
       const chainId = profile.chainId ?? "unknown";
       if (!ca) continue;
       const links = profile.links ?? [];
-      const tgLink = links.find(
-        (l) =>
-          l.url &&
-          (l.type === "telegram" ||
-            (l.label ?? "").toLowerCase().includes("telegram") ||
-            l.url.includes("t.me") ||
-            l.url.includes("telegram")),
-      );
-      if (!tgLink?.url) continue;
+
+      const tgUrl = extractLink(links, { type: "telegram", urlIncludes: ["t.me", "telegram"] });
+      if (!tgUrl) continue;
+
+      const websiteUrl = extractLink(links, { type: "website", urlIncludes: [] });
+      const twitterUrl = extractLink(links, {
+        type: "twitter",
+        urlIncludes: ["twitter.com", "x.com"],
+      });
 
       const rawIcon = profile.icon;
       const imageUrl =
@@ -43,13 +64,13 @@ export async function fetchDexScreener(_sinceMs: number): Promise<TokenAlert[]> 
           ? profile.openGraph
           : undefined;
 
-      candidates.push({ ca, chainId, tgUrl: tgLink.url, imageUrl });
+      candidates.push({ ca, chainId, tgUrl, imageUrl, websiteUrl, twitterUrl });
     }
 
     const pairInfo = await getPairInfo(candidates.map((c) => c.ca));
 
     const results: TokenAlert[] = [];
-    for (const { ca, chainId, tgUrl, imageUrl } of candidates) {
+    for (const { ca, chainId, tgUrl, imageUrl, websiteUrl, twitterUrl } of candidates) {
       const info = pairInfo.get(ca.toLowerCase());
       if (info && !isRecent(info.createdAt)) continue;
       results.push({
@@ -60,6 +81,14 @@ export async function fetchDexScreener(_sinceMs: number): Promise<TokenAlert[]> 
         telegramLink: tgUrl,
         source: `DexScreener (${chainId})`,
         imageUrl,
+        websiteUrl,
+        twitterUrl,
+        priceUsd: info?.priceUsd,
+        fdv: info?.fdv,
+        volume24h: info?.volume24h,
+        liquidity: info?.liquidity,
+        buys24h: info?.buys24h,
+        sells24h: info?.sells24h,
       });
     }
 

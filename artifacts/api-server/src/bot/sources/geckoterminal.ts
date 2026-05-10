@@ -1,7 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
-import { getCreationTimes, isRecent } from "./utils";
+import { getPairInfo, isRecent } from "./utils";
 
 const GT_URL = "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated";
 
@@ -12,6 +12,8 @@ interface GeckoToken {
     name?: string;
     symbol?: string;
     telegram_handle?: string;
+    websites?: string[];
+    twitter_handle?: string;
     image_url?: string;
   };
   relationships?: {
@@ -35,6 +37,8 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
       tgLink: string;
       network: string;
       imageUrl?: string;
+      websiteUrl?: string;
+      twitterUrl?: string;
     }> = [];
 
     for (const token of tokens) {
@@ -52,23 +56,39 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
       const imageUrl =
         attrs?.image_url && attrs.image_url.startsWith("http") ? attrs.image_url : undefined;
 
-      candidates.push({ ca, symbol, name: attrs?.name, tgLink, network, imageUrl });
+      const websiteUrl = attrs?.websites?.[0];
+      const twitterHandle = attrs?.twitter_handle;
+      const twitterUrl = twitterHandle
+        ? twitterHandle.startsWith("http")
+          ? twitterHandle
+          : `https://twitter.com/${twitterHandle.replace(/^@/, "")}`
+        : undefined;
+
+      candidates.push({ ca, symbol, name: attrs?.name, tgLink, network, imageUrl, websiteUrl, twitterUrl });
     }
 
-    const creationTimes = await getCreationTimes(candidates.map((c) => c.ca));
+    const pairInfo = await getPairInfo(candidates.map((c) => c.ca));
 
     const results: TokenAlert[] = [];
-    for (const { ca, symbol, name, tgLink, network, imageUrl } of candidates) {
-      const createdAt = creationTimes.get(ca.toLowerCase());
-      if (createdAt && !isRecent(createdAt)) continue;
+    for (const { ca, symbol, name, tgLink, network, imageUrl, websiteUrl, twitterUrl } of candidates) {
+      const info = pairInfo.get(ca.toLowerCase());
+      if (info && !isRecent(info.createdAt)) continue;
       results.push({
         ca,
-        symbol,
-        name,
+        symbol: info?.symbol ?? symbol,
+        name: info?.name ?? name,
         chain: network,
         telegramLink: tgLink,
         source: `GeckoTerminal (${network})`,
         imageUrl,
+        websiteUrl,
+        twitterUrl,
+        priceUsd: info?.priceUsd,
+        fdv: info?.fdv,
+        volume24h: info?.volume24h,
+        liquidity: info?.liquidity,
+        buys24h: info?.buys24h,
+        sells24h: info?.sells24h,
       });
     }
 
