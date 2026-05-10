@@ -6,11 +6,17 @@ export interface PairInfo {
   createdAt: number;
   symbol?: string;
   name?: string;
+  priceUsd?: number;
+  fdv?: number;
+  volume24h?: number;
+  liquidity?: number;
+  buys24h?: number;
+  sells24h?: number;
 }
 
 /**
  * Batch-fetches pair data for a list of token addresses via DexScreener.
- * Returns a Map of lowercase(CA) → PairInfo (earliest creation time + symbol/name).
+ * Returns a Map of lowercase(CA) → PairInfo (earliest creation time + full market data).
  */
 export async function getPairInfo(addresses: string[]): Promise<Map<string, PairInfo>> {
   const result = new Map<string, PairInfo>();
@@ -30,6 +36,11 @@ export async function getPairInfo(addresses: string[]): Promise<Map<string, Pair
       const pairs: Array<{
         baseToken?: { address?: string; name?: string; symbol?: string };
         pairCreatedAt?: number;
+        priceUsd?: string;
+        fdv?: number;
+        volume?: { h24?: number };
+        liquidity?: { usd?: number };
+        txns?: { h24?: { buys?: number; sells?: number } };
       }> = res.data?.pairs ?? [];
 
       for (const pair of pairs) {
@@ -42,6 +53,12 @@ export async function getPairInfo(addresses: string[]): Promise<Map<string, Pair
             createdAt,
             symbol: pair.baseToken?.symbol,
             name: pair.baseToken?.name,
+            priceUsd: pair.priceUsd ? parseFloat(pair.priceUsd) : undefined,
+            fdv: pair.fdv ?? undefined,
+            volume24h: pair.volume?.h24 ?? undefined,
+            liquidity: pair.liquidity?.usd ?? undefined,
+            buys24h: pair.txns?.h24?.buys ?? undefined,
+            sells24h: pair.txns?.h24?.sells ?? undefined,
           });
         }
       }
