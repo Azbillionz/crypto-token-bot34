@@ -15,8 +15,10 @@ COPY lib/ ./lib/
 # Copy only the bot package manifest first (layer cache for deps)
 COPY artifacts/api-server/package.json ./artifacts/api-server/
 
-# Install all dependencies (frozen = exact versions from lockfile, no resolution)
-RUN pnpm install --frozen-lockfile
+# Install all dependencies
+# Note: --no-frozen-lockfile needed because pnpm-workspace.yaml has
+# Replit-specific platform overrides that differ from the lockfile on Linux/amd64
+RUN pnpm install --no-frozen-lockfile
 
 # Copy bot source code
 COPY artifacts/api-server/ ./artifacts/api-server/
