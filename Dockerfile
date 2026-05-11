@@ -16,7 +16,7 @@ COPY lib/ ./lib/
 COPY artifacts/api-server/package.json ./artifacts/api-server/
 
 # Install all dependencies (frozen = exact versions from lockfile, no resolution)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copy bot source code
 COPY artifacts/api-server/ ./artifacts/api-server/
