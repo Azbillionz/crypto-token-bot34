@@ -47,3 +47,11 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment secrets — never commit these
+.env
+.env.local
+.env.*.local
+
+# Bot runtime cache — ephemeral, not needed in git
+seen-tokens.json

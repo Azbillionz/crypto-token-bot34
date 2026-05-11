@@ -2,12 +2,29 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startWorker } from "./bot/worker";
 
+// ─── Crash Recovery ──────────────────────────────────────────────────────────
+// Exit cleanly on unhandled errors so Railway/Render restart the process
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception — process exiting for restart");
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason: String(reason) }, "Unhandled rejection — process exiting for restart");
+  process.exit(1);
+});
+
+// ─── Graceful Shutdown ───────────────────────────────────────────────────────
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM received — shutting down gracefully");
+  process.exit(0);
+});
+
+// ─── Server ──────────────────────────────────────────────────────────────────
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+  throw new Error("PORT environment variable is required but was not provided.");
 }
 
 const port = Number(rawPort);
