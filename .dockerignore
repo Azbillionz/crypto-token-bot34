@@ -1,0 +1,35 @@
+# Dependencies — installed fresh inside Docker
+node_modules
+**/node_modules
+
+# Compiled output — rebuilt inside Docker
+dist
+**/dist
+*.tsbuildinfo
+
+# Replit-specific files
+.cache
+.local
+.replit
+replit.nix
+
+# Environment secrets — NEVER bake into image
+.env
+**/.env
+
+# Cache files — ephemeral, not needed in image
+seen-tokens.json
+
+# Dev tooling
+.vscode
+.idea
+*.sublime-workspace
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log
+yarn-error.log
+*.log
