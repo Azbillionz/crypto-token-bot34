@@ -6,6 +6,7 @@ import { fetchPumpFun } from "./sources/pumpfun";
 import { fetchSunPump } from "./sources/sunpump";
 import { fetchTop100Token } from "./sources/top100token";
 import { fetchGeckoTerminal } from "./sources/geckoterminal";
+import { fetchRaydium } from "./sources/raydium";
 
 const INTERVAL_MS = 60_000;
 
@@ -16,12 +17,13 @@ async function runCycle(): Promise<void> {
   const sinceMs = lastPollTime;
   logger.info({ sinceMs: new Date(sinceMs).toISOString() }, "Worker cycle started — polling all sources");
 
-  const [dex, pump, sun, boosted, gecko] = await Promise.allSettled([
+  const [dex, pump, sun, boosted, gecko, raydium] = await Promise.allSettled([
     fetchDexScreener(sinceMs),
     fetchPumpFun(sinceMs),
     fetchSunPump(sinceMs),
     fetchTop100Token(sinceMs),
     fetchGeckoTerminal(sinceMs),
+    fetchRaydium(sinceMs),
   ]);
 
   const all = [
@@ -30,6 +32,7 @@ async function runCycle(): Promise<void> {
     ...(sun.status === "fulfilled" ? sun.value : []),
     ...(boosted.status === "fulfilled" ? boosted.value : []),
     ...(gecko.status === "fulfilled" ? gecko.value : []),
+    ...(raydium.status === "fulfilled" ? raydium.value : []),
   ];
 
   logger.info({ total: all.length }, "Tokens found across all sources");

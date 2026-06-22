@@ -12,11 +12,15 @@ export interface PairInfo {
   liquidity?: number;
   buys24h?: number;
   sells24h?: number;
+  telegramLink?: string;
+  websiteUrl?: string;
+  twitterUrl?: string;
+  imageUrl?: string;
 }
 
 /**
  * Batch-fetches pair data for a list of token addresses via DexScreener.
- * Returns a Map of lowercase(CA) → PairInfo (earliest creation time + full market data).
+ * Returns a Map of lowercase(CA) → PairInfo (earliest creation time + full market data + socials).
  */
 export async function getPairInfo(addresses: string[]): Promise<Map<string, PairInfo>> {
   const result = new Map<string, PairInfo>();
@@ -41,12 +45,31 @@ export async function getPairInfo(addresses: string[]): Promise<Map<string, Pair
         volume?: { h24?: number };
         liquidity?: { usd?: number };
         txns?: { h24?: { buys?: number; sells?: number } };
+        info?: {
+          imageUrl?: string;
+          websites?: Array<{ label?: string; url?: string }>;
+          socials?: Array<{ type?: string; url?: string }>;
+        };
       }> = res.data?.pairs ?? [];
 
       for (const pair of pairs) {
         const ca = pair.baseToken?.address?.toLowerCase();
         const createdAt = pair.pairCreatedAt;
         if (!ca || !createdAt) continue;
+
+        const telegramSocial = pair.info?.socials?.find(
+          (s) => s.type?.toLowerCase() === "telegram",
+        );
+        const twitterSocial = pair.info?.socials?.find(
+          (s) => s.type?.toLowerCase() === "twitter",
+        );
+        const websiteUrl = pair.info?.websites?.[0]?.url;
+        const telegramLink = telegramSocial?.url;
+        const twitterUrl = twitterSocial?.url;
+        const imageUrl = pair.info?.imageUrl?.startsWith("http")
+          ? pair.info.imageUrl
+          : undefined;
+
         const existing = result.get(ca);
         if (!existing || existing.createdAt > createdAt) {
           result.set(ca, {
@@ -59,7 +82,16 @@ export async function getPairInfo(addresses: string[]): Promise<Map<string, Pair
             liquidity: pair.liquidity?.usd ?? undefined,
             buys24h: pair.txns?.h24?.buys ?? undefined,
             sells24h: pair.txns?.h24?.sells ?? undefined,
+            telegramLink,
+            websiteUrl,
+            twitterUrl,
+            imageUrl,
           });
+        } else if (existing && !existing.telegramLink && telegramLink) {
+          existing.telegramLink = telegramLink;
+          existing.twitterUrl = twitterUrl ?? existing.twitterUrl;
+          existing.websiteUrl = websiteUrl ?? existing.websiteUrl;
+          existing.imageUrl = imageUrl ?? existing.imageUrl;
         }
       }
     } catch (_) {}
