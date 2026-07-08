@@ -31,12 +31,19 @@ export async function getPairInfo(addresses: string[]): Promise<Map<string, Pair
     chunks.push(addresses.slice(i, i + 30));
   }
 
-  for (const chunk of chunks) {
-    try {
-      const res = await axios.get(
+  const chunkResults = await Promise.allSettled(
+    chunks.map((chunk) =>
+      axios.get(
         `https://api.dexscreener.com/latest/dex/tokens/${chunk.join(",")}`,
         { timeout: 10000 },
-      );
+      )
+    )
+  );
+
+  for (const settled of chunkResults) {
+    if (settled.status === "rejected") continue;
+    try {
+      const res = settled.value;
       const pairs: Array<{
         baseToken?: { address?: string; name?: string; symbol?: string };
         pairCreatedAt?: number;

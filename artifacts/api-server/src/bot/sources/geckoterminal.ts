@@ -1,7 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
-import { getPairInfo, isRecent } from "./utils";
+import { getPairInfo } from "./utils";
 
 const GT_BASE = "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated";
 const PAGES = [1, 2, 3];
@@ -85,7 +85,6 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
     const results: TokenAlert[] = [];
     for (const { ca, symbol, name, tgLink, network, imageUrl, websiteUrl, twitterUrl } of candidates) {
       const info = pairInfo.get(ca.toLowerCase());
-      if (info && !isRecent(info.createdAt)) continue;
       results.push({
         ca,
         symbol: info?.symbol ?? symbol,
