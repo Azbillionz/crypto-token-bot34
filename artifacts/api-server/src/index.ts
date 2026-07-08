@@ -3,15 +3,13 @@ import { logger } from "./lib/logger";
 import { startWorker } from "./bot/worker";
 
 // ─── Crash Recovery ──────────────────────────────────────────────────────────
-// Exit cleanly on unhandled errors so Railway/Render restart the process
+// Log errors but DO NOT exit — keep the bot running 24/7
 process.on("uncaughtException", (err) => {
-  logger.error({ err }, "Uncaught exception — process exiting for restart");
-  process.exit(1);
+  logger.error({ err }, "Uncaught exception — continuing");
 });
 
 process.on("unhandledRejection", (reason) => {
-  logger.error({ reason: String(reason) }, "Unhandled rejection — process exiting for restart");
-  process.exit(1);
+  logger.error({ reason: String(reason) }, "Unhandled rejection — continuing");
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────────────

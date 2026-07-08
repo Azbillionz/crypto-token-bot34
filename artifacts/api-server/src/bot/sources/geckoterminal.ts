@@ -3,6 +3,8 @@ import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
 import { getPairInfo } from "./utils";
 
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
 const GT_BASE = "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated";
 const PAGES = [1, 2, 3];
 
@@ -85,6 +87,8 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
     const results: TokenAlert[] = [];
     for (const { ca, symbol, name, tgLink, network, imageUrl, websiteUrl, twitterUrl } of candidates) {
       const info = pairInfo.get(ca.toLowerCase());
+      // Only send tokens whose pair was created within the last 24 hours
+      if (info && Date.now() - info.createdAt > TWENTY_FOUR_HOURS_MS) continue;
       results.push({
         ca,
         symbol: info?.symbol ?? symbol,
