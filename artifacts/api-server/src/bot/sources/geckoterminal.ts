@@ -3,116 +3,100 @@ import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
 import { getPairInfo } from "./utils";
 
+const GT_BASE = "https://api.geckoterminal.com/api/v2";
 
-const GT_BASE = "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated";
-const PAGES = [1, 2, 3];
+// Networks to scan for new pools
+const NETWORKS = ["solana", "bsc", "eth", "base", "arbitrum"];
 
-interface GeckoToken {
+interface GeckoPool {
   id?: string;
   attributes?: {
-    address?: string;
     name?: string;
-    symbol?: string;
-    telegram_handle?: string;
-    websites?: string[];
-    twitter_handle?: string;
-    image_url?: string;
+    pool_created_at?: string;
   };
   relationships?: {
+    base_token?: { data?: { id?: string } };
     network?: { data?: { id?: string } };
   };
 }
 
+function extractAddress(tokenId?: string): string | undefined {
+  if (!tokenId) return undefined;
+  // Format: "solana_<address>" or "eth_0x..."
+  const idx = tokenId.indexOf("_");
+  return idx >= 0 ? tokenId.slice(idx + 1) : tokenId;
+}
+
 export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]> {
   try {
-    const pageResponses = await Promise.allSettled(
-      PAGES.map((page) =>
-        axios.get<{ data: GeckoToken[] }>(`${GT_BASE}?page=${page}`, {
+    // Fetch new_pools for all networks in parallel
+    const poolResponses = await Promise.allSettled(
+      NETWORKS.map((net) =>
+        axios.get<{ data: GeckoPool[] }>(`${GT_BASE}/networks/${net}/new_pools?page=1`, {
           timeout: 12000,
           headers: { Accept: "application/json" },
-        }),
-      ),
+        })
+      )
     );
 
-    const tokens: GeckoToken[] = [];
-    for (const r of pageResponses) {
-      if (r.status === "fulfilled") {
-        tokens.push(...(r.value.data?.data ?? []));
+    // Extract base token addresses
+    const candidates: Array<{ ca: string; network: string }> = [];
+    const seen = new Set<string>();
+
+    for (let i = 0; i < NETWORKS.length; i++) {
+      const res = poolResponses[i];
+      if (res.status !== "fulfilled") continue;
+      const pools: GeckoPool[] = res.value.data?.data ?? [];
+      const net = NETWORKS[i];
+
+      for (const pool of pools) {
+        const tokenId = pool.relationships?.base_token?.data?.id;
+        const ca = extractAddress(tokenId);
+        if (!ca || seen.has(ca.toLowerCase())) continue;
+        seen.add(ca.toLowerCase());
+        candidates.push({ ca, network: net });
       }
     }
 
-    const seen = new Set<string>();
-    const candidates: Array<{
-      ca: string;
-      symbol: string;
-      name?: string;
-      tgLink: string;
-      network: string;
-      imageUrl?: string;
-      websiteUrl?: string;
-      twitterUrl?: string;
-    }> = [];
-
-    for (const token of tokens) {
-      const attrs = token.attributes;
-      const ca = attrs?.address;
-      const symbol = attrs?.symbol ?? "UNKNOWN";
-      const tgHandle = attrs?.telegram_handle;
-      if (!ca || !tgHandle) continue;
-      if (seen.has(ca.toLowerCase())) continue;
-      seen.add(ca.toLowerCase());
-
-      const network =
-        token.relationships?.network?.data?.id ?? token.id?.split("_")[0] ?? "unknown";
-      const tgLink = tgHandle.startsWith("http")
-        ? tgHandle
-        : `https://t.me/${tgHandle.replace(/^@/, "")}`;
-      const imageUrl =
-        attrs?.image_url && attrs.image_url.startsWith("http") ? attrs.image_url : undefined;
-
-      const websiteUrl = attrs?.websites?.[0];
-      const twitterHandle = attrs?.twitter_handle;
-      const twitterUrl = twitterHandle
-        ? twitterHandle.startsWith("http")
-          ? twitterHandle
-          : `https://twitter.com/${twitterHandle.replace(/^@/, "")}`
-        : undefined;
-
-      candidates.push({ ca, symbol, name: attrs?.name, tgLink, network, imageUrl, websiteUrl, twitterUrl });
+    if (candidates.length === 0) {
+      logger.info({ source: "GeckoTerminal", found: 0 }, "GeckoTerminal fetch complete");
+      return [];
     }
 
+    // Look up DexScreener for Telegram links and market data
     const pairInfo = await getPairInfo(candidates.map((c) => c.ca));
 
     const results: TokenAlert[] = [];
-    for (const { ca, symbol, name, tgLink, network, imageUrl, websiteUrl, twitterUrl } of candidates) {
+    for (const { ca, network } of candidates) {
       const info = pairInfo.get(ca.toLowerCase());
+      if (!info?.telegramLink) continue; // must have Telegram link from DexScreener
+
       results.push({
         ca,
-        symbol: info?.symbol ?? symbol,
-        name: info?.name ?? name,
+        symbol: info.symbol ?? ca.slice(0, 6).toUpperCase(),
+        name: info.name,
         chain: network,
-        telegramLink: tgLink,
+        telegramLink: info.telegramLink,
         source: `GeckoTerminal (${network})`,
-        imageUrl,
-        websiteUrl,
-        twitterUrl,
-        priceUsd: info?.priceUsd,
-        fdv: info?.fdv,
-        volume24h: info?.volume24h,
-        liquidity: info?.liquidity,
-        buys24h: info?.buys24h,
-        sells24h: info?.sells24h,
+        imageUrl: info.imageUrl,
+        websiteUrl: info.websiteUrl,
+        twitterUrl: info.twitterUrl,
+        priceUsd: info.priceUsd,
+        fdv: info.fdv,
+        volume24h: info.volume24h,
+        liquidity: info.liquidity,
+        buys24h: info.buys24h,
+        sells24h: info.sells24h,
       });
     }
 
     logger.info(
-      { source: "GeckoTerminal", pages: PAGES.length, scanned: candidates.length, found: results.length },
-      "GeckoTerminal fetch complete",
+      { source: "GeckoTerminal", networks: NETWORKS.length, scanned: candidates.length, found: results.length },
+      "GeckoTerminal fetch complete"
     );
     return results;
   } catch (err) {
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    logger.warn({ source: "GeckoTerminal", status }, "GeckoTerminal fetch failed");
+    logger.warn({ source: "GeckoTerminal", err: (err as Error).message?.slice(0, 80) }, "GeckoTerminal fetch failed");
     return [];
   }
 }
