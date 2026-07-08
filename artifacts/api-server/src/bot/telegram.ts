@@ -141,14 +141,23 @@ export async function sendTokenAlert(alert: TokenAlert): Promise<void> {
       await bot.sendMessage(channelId!, caption, { parse_mode: "HTML" });
     }
     logger.info({ ca: alert.ca, symbol: alert.symbol, source: alert.source }, "Alert sent");
-  } catch (err) {
+  } catch (err: any) {
     if (alert.imageUrl) {
       try {
         await bot.sendMessage(channelId!, caption, { parse_mode: "HTML" });
         logger.info({ ca: alert.ca, symbol: alert.symbol, source: alert.source }, "Alert sent (text fallback)");
         return;
-      } catch (_) {}
+      } catch (err2: any) {
+        logger.error(
+          { message: err2?.message, code: err2?.code, ca: alert.ca },
+          "Failed to send Telegram alert (text fallback)"
+        );
+        return;
+      }
     }
-    logger.error({ err, ca: alert.ca }, "Failed to send Telegram alert");
+    logger.error(
+      { message: err?.message, code: err?.code, ca: alert.ca },
+      "Failed to send Telegram alert"
+    );
   }
 }

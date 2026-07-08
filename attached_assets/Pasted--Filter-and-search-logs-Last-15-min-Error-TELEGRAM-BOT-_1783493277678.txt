@@ -1,0 +1,86 @@
+
+Filter and search logs
+
+Last 15 min
+
+
+Error: TELEGRAM_BOT_TOKEN is not set
+    at <anonymous> (/app/src/bot/telegram.ts:7:19)
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+Node.js v20.20.2
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+Node.js v20.20.2
+/app/src/bot/telegram.ts:7
+if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not set");
+                  ^
+Error: TELEGRAM_BOT_TOKEN is not set
+    at <anonymous> (/app/src/bot/telegram.ts:7:19)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+Node.js v20.20.2
+/app/src/bot/telegram.ts:7
+if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not set");
+                  ^
+Error: TELEGRAM_BOT_TOKEN is not set
+    at <anonymous> (/app/src/bot/telegram.ts:7:19)
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+/app/src/bot/telegram.ts:7
+if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not set");
+                  ^
+Error: TELEGRAM_BOT_TOKEN is not set
+    at <anonymous> (/app/src/bot/telegram.ts:7:19)
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+Node.js v20.20.2
+/app/src/bot/telegram.ts:7
+if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not set");
+                  ^
+Error: TELEGRAM_BOT_TOKEN is not set
+    at <anonymous> (/app/src/bot/telegram.ts:7:19)
+    at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+Node.js v20.20.2
+Server listening
+Crypto token monitor worker starting
+Worker cycle started — polling all sources
+Fetching CPMM transactions
+DexScreener fetch complete
+SunPump fetch complete
+Boosted tokens fetch complete
+request completed
+Raydium/Jupiter fetch complete
+Starting Container
+GeckoTerminal fetch complete
+Tokens found across all sources
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
+Failed to send Telegram alert
