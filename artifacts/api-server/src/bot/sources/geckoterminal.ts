@@ -3,7 +3,8 @@ import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
 import { getPairInfo, isRecent } from "./utils";
 
-const GT_URL = "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated";
+const GT_BASE = "https://api.geckoterminal.com/api/v2/tokens/info_recently_updated";
+const PAGES = [1, 2, 3];
 
 interface GeckoToken {
   id?: string;
@@ -23,13 +24,23 @@ interface GeckoToken {
 
 export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]> {
   try {
-    const res = await axios.get<{ data: GeckoToken[] }>(GT_URL, {
-      timeout: 10000,
-      headers: { Accept: "application/json" },
-    });
+    const pageResponses = await Promise.allSettled(
+      PAGES.map((page) =>
+        axios.get<{ data: GeckoToken[] }>(`${GT_BASE}?page=${page}`, {
+          timeout: 12000,
+          headers: { Accept: "application/json" },
+        }),
+      ),
+    );
 
-    const tokens: GeckoToken[] = res.data?.data ?? [];
+    const tokens: GeckoToken[] = [];
+    for (const r of pageResponses) {
+      if (r.status === "fulfilled") {
+        tokens.push(...(r.value.data?.data ?? []));
+      }
+    }
 
+    const seen = new Set<string>();
     const candidates: Array<{
       ca: string;
       symbol: string;
@@ -47,6 +58,8 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
       const symbol = attrs?.symbol ?? "UNKNOWN";
       const tgHandle = attrs?.telegram_handle;
       if (!ca || !tgHandle) continue;
+      if (seen.has(ca.toLowerCase())) continue;
+      seen.add(ca.toLowerCase());
 
       const network =
         token.relationships?.network?.data?.id ?? token.id?.split("_")[0] ?? "unknown";
@@ -92,7 +105,10 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
       });
     }
 
-    logger.info({ source: "GeckoTerminal", found: results.length }, "GeckoTerminal fetch complete");
+    logger.info(
+      { source: "GeckoTerminal", pages: PAGES.length, scanned: candidates.length, found: results.length },
+      "GeckoTerminal fetch complete",
+    );
     return results;
   } catch (err) {
     const status = (err as { response?: { status?: number } })?.response?.status;
