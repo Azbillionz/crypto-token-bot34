@@ -7,7 +7,7 @@ const channelId = process.env["TELEGRAM_CHANNEL_ID"];
 if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not set");
 if (!channelId) throw new Error("TELEGRAM_CHANNEL_ID is not set");
 
-const bot = new TelegramBot(token);
+const bot = new TelegramBot(token, { polling: false });
 
 export interface TokenAlert {
   symbol: string;
