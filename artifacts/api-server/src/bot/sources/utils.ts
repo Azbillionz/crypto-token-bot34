@@ -1,6 +1,7 @@
 import axios from "axios";
 
 export const TEN_MIN_MS = 10 * 60 * 1000;
+export const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 export interface PairInfo {
   createdAt: number;

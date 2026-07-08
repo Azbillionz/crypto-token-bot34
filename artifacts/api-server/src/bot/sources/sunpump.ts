@@ -1,7 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
-import { isRecent } from "./utils";
+import { TWENTY_FOUR_HOURS_MS } from "./utils";
 
 const SUNPUMP_URL = "https://api.sunpump.meme/pump-api/token/list";
 
@@ -59,7 +59,7 @@ export async function fetchSunPump(_sinceMs: number): Promise<TokenAlert[]> {
           ? new Date(token.tokenCreatedInstant).getTime()
           : Number(token.tokenCreatedInstant)
         : 0;
-      if (rawTs > 0 && !isRecent(rawTs)) continue;
+      if (rawTs === 0 || Date.now() - rawTs > TWENTY_FOUR_HOURS_MS) continue;
 
       const tgLink = tg.startsWith("http") ? tg : `https://t.me/${tg.replace(/^@/, "")}`;
       const imageUrl = token.logoUrl && token.logoUrl.startsWith("http") ? token.logoUrl : undefined;
