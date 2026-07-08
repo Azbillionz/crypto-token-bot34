@@ -2,10 +2,10 @@ import TelegramBot from "node-telegram-bot-api";
 import { logger } from "../lib/logger";
 
 const token = process.env["TELEGRAM_BOT_TOKEN"];
-const channelId = process.env["TELEGRAM_GROUP_ID"] ?? process.env["TELEGRAM_CHANNEL_ID"];
+const channelId = process.env["TELEGRAM_CHANNEL_ID"];
 
 if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not set");
-if (!channelId) throw new Error("Neither TELEGRAM_GROUP_ID nor TELEGRAM_CHANNEL_ID is set");
+if (!channelId) throw new Error("TELEGRAM_CHANNEL_ID is not set");
 
 const bot = new TelegramBot(token);
 
