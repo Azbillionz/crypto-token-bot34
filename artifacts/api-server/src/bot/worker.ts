@@ -32,14 +32,22 @@ async function runCycle(): Promise<void> {
     ...(sun.status === "fulfilled" ? sun.value : []),
   ];
 
-  logger.info({ total: all.length }, "Tokens found across all sources");
+  // Only keep tokens that have a Telegram link
+  const withTg = all.filter((t) => t.telegramLink && t.telegramLink.trim().length > 0);
+
+  logger.info({ total: all.length, withTelegram: withTg.length }, "Tokens found across all sources");
 
   let sent = 0;
-  for (const token of all) {
+  for (const token of withTg) {
     if (hasSeen(token.ca)) continue;
-    markSeen(token.ca);
-    await sendTokenAlert(token);
-    sent++;
+    try {
+      await sendTokenAlert(token);
+      // Only mark as seen AFTER a successful send
+      markSeen(token.ca);
+      sent++;
+    } catch (err: any) {
+      logger.error({ message: err?.message, ca: token.ca }, "Send failed — will retry next cycle");
+    }
   }
 
   lastPollTime = cycleStart;

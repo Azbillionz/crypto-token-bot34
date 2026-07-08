@@ -131,33 +131,20 @@ function buildCaption(alert: TokenAlert): string {
 export async function sendTokenAlert(alert: TokenAlert): Promise<void> {
   const caption = buildCaption(alert);
 
-  try {
-    if (alert.imageUrl) {
+  if (alert.imageUrl) {
+    try {
       await bot.sendPhoto(channelId!, alert.imageUrl, {
         caption,
         parse_mode: "HTML",
       });
-    } else {
-      await bot.sendMessage(channelId!, caption, { parse_mode: "HTML" });
+      logger.info({ ca: alert.ca, symbol: alert.symbol, source: alert.source }, "Alert sent (with photo)");
+      return;
+    } catch (err: any) {
+      logger.warn({ message: err?.message, ca: alert.ca }, "Photo send failed — falling back to text");
     }
-    logger.info({ ca: alert.ca, symbol: alert.symbol, source: alert.source }, "Alert sent");
-  } catch (err: any) {
-    if (alert.imageUrl) {
-      try {
-        await bot.sendMessage(channelId!, caption, { parse_mode: "HTML" });
-        logger.info({ ca: alert.ca, symbol: alert.symbol, source: alert.source }, "Alert sent (text fallback)");
-        return;
-      } catch (err2: any) {
-        logger.error(
-          { message: err2?.message, code: err2?.code, ca: alert.ca },
-          "Failed to send Telegram alert (text fallback)"
-        );
-        return;
-      }
-    }
-    logger.error(
-      { message: err?.message, code: err?.code, ca: alert.ca },
-      "Failed to send Telegram alert"
-    );
   }
+
+  // Send as plain text (or as fallback when photo fails)
+  await bot.sendMessage(channelId!, caption, { parse_mode: "HTML" });
+  logger.info({ ca: alert.ca, symbol: alert.symbol, source: alert.source }, "Alert sent");
 }
