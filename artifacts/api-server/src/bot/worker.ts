@@ -9,13 +9,9 @@ import { fetchRaydium } from "./sources/raydium";
 
 const INTERVAL_MS = 60_000;
 
-let lastPollTime = Date.now() - INTERVAL_MS * 2;
+let isFirstRun = true;
 
-async function runCycle(): Promise<void> {
-  const cycleStart = Date.now();
-  const sinceMs = lastPollTime;
-  logger.info({ sinceMs: new Date(sinceMs).toISOString() }, "Worker cycle started — polling all sources");
-
+async function fetchAll(sinceMs: number) {
   const [gecko, dex, boosted, raydium, sun] = await Promise.allSettled([
     fetchGeckoTerminal(sinceMs),
     fetchDexScreener(sinceMs),
@@ -24,25 +20,38 @@ async function runCycle(): Promise<void> {
     fetchSunPump(sinceMs),
   ]);
 
-  const all = [
+  return [
     ...(gecko.status === "fulfilled" ? gecko.value : []),
     ...(dex.status === "fulfilled" ? dex.value : []),
     ...(boosted.status === "fulfilled" ? boosted.value : []),
     ...(raydium.status === "fulfilled" ? raydium.value : []),
     ...(sun.status === "fulfilled" ? sun.value : []),
   ];
+}
 
-  // Only keep tokens that have a Telegram link
-  const withTg = all.filter((t) => t.telegramLink && t.telegramLink.trim().length > 0);
+async function runCycle(): Promise<void> {
+  const sinceMs = Date.now() - INTERVAL_MS * 2;
 
-  logger.info({ total: all.length, withTelegram: withTg.length }, "Tokens found across all sources");
+  if (isFirstRun) {
+    // Seed the cache with everything currently visible — don't send anything
+    logger.info("Startup dry-run — seeding seen cache, no alerts sent");
+    const all = await fetchAll(sinceMs);
+    for (const token of all) markSeen(token.ca);
+    logger.info({ seeded: all.length }, "Dry-run complete — bot will now send only NEW tokens");
+    isFirstRun = false;
+    return;
+  }
+
+  logger.info("Worker cycle started — polling all sources");
+  const all = await fetchAll(sinceMs);
+  const withTg = all.filter((t) => t.telegramLink?.trim());
+  logger.info({ total: all.length, withTelegram: withTg.length }, "Tokens found");
 
   let sent = 0;
   for (const token of withTg) {
     if (hasSeen(token.ca)) continue;
     try {
       await sendTokenAlert(token);
-      // Only mark as seen AFTER a successful send
       markSeen(token.ca);
       sent++;
     } catch (err: any) {
@@ -50,7 +59,6 @@ async function runCycle(): Promise<void> {
     }
   }
 
-  lastPollTime = cycleStart;
   logger.info({ sent }, "Worker cycle complete");
 }
 

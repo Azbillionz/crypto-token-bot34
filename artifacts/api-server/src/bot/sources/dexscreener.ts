@@ -1,7 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
-import { getPairInfo, TWENTY_FOUR_HOURS_MS } from "./utils";
+import { getPairInfo } from "./utils";
 
 const PROFILES_URL = "https://api.dexscreener.com/token-profiles/latest/v1";
 
@@ -72,7 +72,6 @@ export async function fetchDexScreener(_sinceMs: number): Promise<TokenAlert[]> 
     const results: TokenAlert[] = [];
     for (const { ca, chainId, tgUrl, imageUrl, websiteUrl, twitterUrl } of candidates) {
       const info = pairInfo.get(ca.toLowerCase());
-      if (!info || Date.now() - info.createdAt > TWENTY_FOUR_HOURS_MS) continue;
       results.push({
         ca,
         symbol: info?.symbol ?? ca.slice(0, 6).toUpperCase(),
