@@ -87,8 +87,8 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
     const results: TokenAlert[] = [];
     for (const { ca, symbol, name, tgLink, network, imageUrl, websiteUrl, twitterUrl } of candidates) {
       const info = pairInfo.get(ca.toLowerCase());
-      // Only send tokens whose pair was created within the last 24 hours
-      if (info && Date.now() - info.createdAt > TWENTY_FOUR_HOURS_MS) continue;
+      // Require DexScreener pair data — skip if unverifiable or older than 24h
+      if (!info || Date.now() - info.createdAt > TWENTY_FOUR_HOURS_MS) continue;
       results.push({
         ca,
         symbol: info?.symbol ?? symbol,
