@@ -1,7 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
-import { getPairInfo, isWithin24h, fetchWithRetry } from "./utils";
+import { getPairInfo, isWithin24h, isUnderMaxMarketCap, fetchWithRetry } from "./utils";
 
 const GT_BASE = "https://api.geckoterminal.com/api/v2";
 const RECENT_URL = `${GT_BASE}/tokens/info_recently_updated`;
@@ -141,6 +141,7 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
       for (const t of recentTokens) {
         const info = pairInfo.get(t.ca.toLowerCase());
         if (info?.createdAt && !isWithin24h(info.createdAt)) continue; // only genuinely new tokens
+        if (!info || !isUnderMaxMarketCap(info)) continue; // max $10k market cap
         addedCas.add(t.ca.toLowerCase());
         results.push({
           ca: t.ca,
@@ -170,6 +171,7 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
         const info = pairInfo.get(c.ca.toLowerCase());
         if (!info?.telegramLink) continue;
         if (info.createdAt && !isWithin24h(info.createdAt)) continue; // only genuinely new tokens
+        if (!isUnderMaxMarketCap(info)) continue; // max $10k market cap
         results.push({
           ca: c.ca,
           symbol: info.symbol ?? c.ca.slice(0, 6).toUpperCase(),

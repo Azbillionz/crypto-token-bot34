@@ -1,7 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
-import { getPairInfo, TEN_MIN_MS, isRecent } from "./utils";
+import { getPairInfo, TEN_MIN_MS, isRecent, isUnderMaxMarketCap } from "./utils";
 
 const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
 
@@ -112,6 +112,7 @@ export async function fetchRaydium(sinceMs: number): Promise<TokenAlert[]> {
       if (!info) continue;
       if (!isRecent(info.createdAt)) continue; // pair must be < 10 min old
       if (!info.telegramLink) continue;         // must have Telegram link
+      if (!isUnderMaxMarketCap(info)) continue; // max $10k market cap
 
       results.push({
         ca,

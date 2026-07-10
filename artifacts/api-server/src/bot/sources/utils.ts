@@ -3,12 +3,15 @@ import axios from "axios";
 export const TEN_MIN_MS = 10 * 60 * 1000;
 export const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
+export const MAX_MARKET_CAP_USD = 10_000;
+
 export interface PairInfo {
   createdAt: number;
   symbol?: string;
   name?: string;
   priceUsd?: number;
   fdv?: number;
+  marketCap?: number;
   volume24h?: number;
   liquidity?: number;
   buys24h?: number;
@@ -50,6 +53,7 @@ export async function getPairInfo(addresses: string[]): Promise<Map<string, Pair
         pairCreatedAt?: number;
         priceUsd?: string;
         fdv?: number;
+        marketCap?: number;
         volume?: { h24?: number };
         liquidity?: { usd?: number };
         txns?: { h24?: { buys?: number; sells?: number } };
@@ -86,6 +90,7 @@ export async function getPairInfo(addresses: string[]): Promise<Map<string, Pair
             name: pair.baseToken?.name,
             priceUsd: pair.priceUsd ? parseFloat(pair.priceUsd) : undefined,
             fdv: pair.fdv ?? undefined,
+            marketCap: pair.marketCap ?? undefined,
             volume24h: pair.volume?.h24 ?? undefined,
             liquidity: pair.liquidity?.usd ?? undefined,
             buys24h: pair.txns?.h24?.buys ?? undefined,
@@ -128,6 +133,18 @@ export function isRecent(createdAtMs: number): boolean {
 /** Returns true if createdAtMs is within the last 24 hours */
 export function isWithin24h(createdAtMs: number): boolean {
   return Date.now() - createdAtMs <= TWENTY_FOUR_HOURS_MS;
+}
+
+/**
+ * Returns true if the token's market cap is at or below MAX_MARKET_CAP_USD.
+ * Uses marketCap when available, falling back to FDV. If neither value is
+ * known, we can't verify the cap, so callers should treat that as "unknown"
+ * rather than assume it passes.
+ */
+export function isUnderMaxMarketCap(info: { marketCap?: number; fdv?: number }): boolean {
+  const cap = info.marketCap ?? info.fdv;
+  if (cap === undefined) return false;
+  return cap <= MAX_MARKET_CAP_USD;
 }
 
 /**

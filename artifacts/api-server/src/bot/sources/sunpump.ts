@@ -1,7 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
-import { TWENTY_FOUR_HOURS_MS } from "./utils";
+import { TWENTY_FOUR_HOURS_MS, getPairInfo, isUnderMaxMarketCap } from "./utils";
 
 const SUNPUMP_URL = "https://api.sunpump.meme/pump-api/token/list";
 
@@ -47,7 +47,7 @@ export async function fetchSunPump(_sinceMs: number): Promise<TokenAlert[]> {
       }
     }
 
-    const results: TokenAlert[] = [];
+    const candidates: Array<{ ca: string; symbol: string; name?: string; tgLink: string; imageUrl?: string }> = [];
     for (const token of tokens) {
       const ca = token.contractAddress;
       const symbol = token.symbol ?? "UNKNOWN";
@@ -64,15 +64,26 @@ export async function fetchSunPump(_sinceMs: number): Promise<TokenAlert[]> {
       const tgLink = tg.startsWith("http") ? tg : `https://t.me/${tg.replace(/^@/, "")}`;
       const imageUrl = token.logoUrl && token.logoUrl.startsWith("http") ? token.logoUrl : undefined;
 
-      results.push({
-        ca,
-        symbol,
-        name: token.name,
-        chain: "tron",
-        telegramLink: tgLink,
-        source: "SunPump",
-        imageUrl,
-      });
+      candidates.push({ ca, symbol, name: token.name, tgLink, imageUrl });
+    }
+
+    const results: TokenAlert[] = [];
+    if (candidates.length > 0) {
+      const pairInfo = await getPairInfo(candidates.map((c) => c.ca));
+      for (const c of candidates) {
+        const info = pairInfo.get(c.ca.toLowerCase());
+        if (info && !isUnderMaxMarketCap(info)) continue; // max $10k market cap (skip check if DexScreener has no data yet)
+
+        results.push({
+          ca: c.ca,
+          symbol: c.symbol,
+          name: c.name,
+          chain: "tron",
+          telegramLink: c.tgLink,
+          source: "SunPump",
+          imageUrl: c.imageUrl,
+        });
+      }
     }
 
     logger.info({ source: "SunPump", found: results.length }, "SunPump fetch complete");
