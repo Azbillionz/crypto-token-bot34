@@ -1,7 +1,7 @@
 import axios from "axios";
 import { logger } from "../../lib/logger";
 import type { TokenAlert } from "../telegram";
-import { getPairInfo } from "./utils";
+import { getPairInfo, isWithin24h, fetchWithRetry } from "./utils";
 
 const GT_BASE = "https://api.geckoterminal.com/api/v2";
 const RECENT_URL = `${GT_BASE}/tokens/info_recently_updated`;
@@ -25,6 +25,9 @@ interface GeckoToken {
 }
 
 interface GeckoPool {
+  attributes?: {
+    pool_created_at?: string;
+  };
   relationships?: {
     base_token?: { data?: { id?: string } };
   };
@@ -41,12 +44,17 @@ async function fetchRecentlyUpdated(): Promise<
 > {
   const pageResponses = await Promise.allSettled(
     PAGES.map((page) =>
-      axios.get<{ data: GeckoToken[] }>(`${RECENT_URL}?page=${page}`, {
+      fetchWithRetry<{ data: GeckoToken[] }>(`${RECENT_URL}?page=${page}`, {
         timeout: 12000,
         headers: { Accept: "application/json" },
       })
     )
   );
+
+  const failedPages = pageResponses.filter((r) => r.status === "rejected").length;
+  if (failedPages > 0) {
+    logger.warn({ source: "GeckoTerminal", failedPages }, "Some recently_updated pages failed after retry");
+  }
 
   const tokens: GeckoToken[] = [];
   for (const r of pageResponses) {
@@ -82,12 +90,17 @@ async function fetchRecentlyUpdated(): Promise<
 async function fetchNewPoolCandidates(): Promise<Array<{ ca: string; network: string }>> {
   const poolResponses = await Promise.allSettled(
     NEW_POOL_NETWORKS.map((net) =>
-      axios.get<{ data: GeckoPool[] }>(`${GT_BASE}/networks/${net}/new_pools?page=1`, {
+      fetchWithRetry<{ data: GeckoPool[] }>(`${GT_BASE}/networks/${net}/new_pools?page=1`, {
         timeout: 12000,
         headers: { Accept: "application/json" },
       })
     )
   );
+
+  const failedNets = poolResponses.filter((r) => r.status === "rejected").length;
+  if (failedNets > 0) {
+    logger.warn({ source: "GeckoTerminal", failedNets }, "Some new_pools networks failed after retry");
+  }
 
   const candidates: Array<{ ca: string; network: string }> = [];
   const seen = new Set<string>();
@@ -97,6 +110,11 @@ async function fetchNewPoolCandidates(): Promise<Array<{ ca: string; network: st
     if (res.status !== "fulfilled") continue;
     const pools: GeckoPool[] = res.value.data?.data ?? [];
     for (const pool of pools) {
+      const createdAt = pool.attributes?.pool_created_at
+        ? new Date(pool.attributes.pool_created_at).getTime()
+        : undefined;
+      if (createdAt && !isWithin24h(createdAt)) continue;
+
       const ca = extractAddress(pool.relationships?.base_token?.data?.id);
       if (!ca || seen.has(ca.toLowerCase())) continue;
       seen.add(ca.toLowerCase());
@@ -122,6 +140,7 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
       const pairInfo = await getPairInfo(recentTokens.map((t) => t.ca));
       for (const t of recentTokens) {
         const info = pairInfo.get(t.ca.toLowerCase());
+        if (info?.createdAt && !isWithin24h(info.createdAt)) continue; // only genuinely new tokens
         addedCas.add(t.ca.toLowerCase());
         results.push({
           ca: t.ca,
@@ -150,6 +169,7 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
       for (const c of freshCandidates) {
         const info = pairInfo.get(c.ca.toLowerCase());
         if (!info?.telegramLink) continue;
+        if (info.createdAt && !isWithin24h(info.createdAt)) continue; // only genuinely new tokens
         results.push({
           ca: c.ca,
           symbol: info.symbol ?? c.ca.slice(0, 6).toUpperCase(),

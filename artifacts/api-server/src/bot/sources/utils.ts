@@ -124,3 +124,30 @@ export async function getCreationTimes(addresses: string[]): Promise<Map<string,
 export function isRecent(createdAtMs: number): boolean {
   return Date.now() - createdAtMs <= TEN_MIN_MS;
 }
+
+/** Returns true if createdAtMs is within the last 24 hours */
+export function isWithin24h(createdAtMs: number): boolean {
+  return Date.now() - createdAtMs <= TWENTY_FOUR_HOURS_MS;
+}
+
+/**
+ * Fetches a URL with a single retry on 429/5xx after a short backoff.
+ * Helps avoid one-off rate-limit blips silently killing a whole source.
+ */
+export async function fetchWithRetry<T>(
+  url: string,
+  config: Record<string, unknown>,
+  retries = 1,
+  backoffMs = 1500,
+): Promise<{ data: T }> {
+  try {
+    return await axios.get<T>(url, config);
+  } catch (err) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (retries > 0 && (status === 429 || (status && status >= 500))) {
+      await new Promise((r) => setTimeout(r, backoffMs));
+      return fetchWithRetry<T>(url, config, retries - 1, backoffMs * 2);
+    }
+    throw err;
+  }
+}
