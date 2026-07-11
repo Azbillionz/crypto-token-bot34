@@ -6,18 +6,20 @@ import { fetchSunPump } from "./sources/sunpump";
 import { fetchTop100Token } from "./sources/top100token";
 import { fetchGeckoTerminal } from "./sources/geckoterminal";
 import { fetchRaydium } from "./sources/raydium";
+import { fetchPumpFun } from "./sources/pumpfun";
 
 const INTERVAL_MS = 60_000;
 
 let isFirstRun = true;
 
 async function fetchAll(sinceMs: number) {
-  const [gecko, dex, boosted, raydium, sun] = await Promise.allSettled([
+  const [gecko, dex, boosted, raydium, sun, pump] = await Promise.allSettled([
     fetchGeckoTerminal(sinceMs),
     fetchDexScreener(sinceMs),
     fetchTop100Token(sinceMs),
     fetchRaydium(sinceMs),
     fetchSunPump(sinceMs),
+    fetchPumpFun(sinceMs),
   ]);
 
   return [
@@ -26,6 +28,7 @@ async function fetchAll(sinceMs: number) {
     ...(boosted.status === "fulfilled" ? boosted.value : []),
     ...(raydium.status === "fulfilled" ? raydium.value : []),
     ...(sun.status === "fulfilled" ? sun.value : []),
+    ...(pump.status === "fulfilled" ? pump.value : []),
   ];
 }
 

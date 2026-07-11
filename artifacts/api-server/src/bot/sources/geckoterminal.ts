@@ -141,7 +141,7 @@ export async function fetchGeckoTerminal(_sinceMs: number): Promise<TokenAlert[]
       for (const t of recentTokens) {
         const info = pairInfo.get(t.ca.toLowerCase());
         if (info?.createdAt && !isWithin24h(info.createdAt)) continue; // only genuinely new tokens
-        if (!info || !isUnderMaxMarketCap(info)) continue; // max $10k market cap
+        if (info && !isUnderMaxMarketCap(info)) continue; // max $10k market cap (allow through if no data yet)
         addedCas.add(t.ca.toLowerCase());
         results.push({
           ca: t.ca,
