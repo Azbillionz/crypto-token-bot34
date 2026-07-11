@@ -1,7 +1,6 @@
 import { logger } from "../lib/logger";
 import { hasSeen, markSeen } from "./cache";
 import { sendTokenAlert } from "./telegram";
-import { fetchDexScreener } from "./sources/dexscreener";
 import { fetchSunPump } from "./sources/sunpump";
 import { fetchTop100Token } from "./sources/top100token";
 import { fetchGeckoTerminal } from "./sources/geckoterminal";
@@ -13,9 +12,8 @@ const INTERVAL_MS = 60_000;
 let isFirstRun = true;
 
 async function fetchAll(sinceMs: number) {
-  const [gecko, dex, boosted, raydium, sun, pump] = await Promise.allSettled([
+  const [gecko, boosted, raydium, sun, pump] = await Promise.allSettled([
     fetchGeckoTerminal(sinceMs),
-    fetchDexScreener(sinceMs),
     fetchTop100Token(sinceMs),
     fetchRaydium(sinceMs),
     fetchSunPump(sinceMs),
@@ -24,7 +22,6 @@ async function fetchAll(sinceMs: number) {
 
   return [
     ...(gecko.status === "fulfilled" ? gecko.value : []),
-    ...(dex.status === "fulfilled" ? dex.value : []),
     ...(boosted.status === "fulfilled" ? boosted.value : []),
     ...(raydium.status === "fulfilled" ? raydium.value : []),
     ...(sun.status === "fulfilled" ? sun.value : []),
@@ -36,7 +33,6 @@ async function runCycle(): Promise<void> {
   const sinceMs = Date.now() - INTERVAL_MS * 2;
 
   if (isFirstRun) {
-    // Seed the cache with everything currently visible — don't send anything
     logger.info("Startup dry-run — seeding seen cache, no alerts sent");
     const all = await fetchAll(sinceMs);
     for (const token of all) markSeen(token.ca);
